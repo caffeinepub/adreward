@@ -1,0 +1,187 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("/assets/fonts/CabinetGrotesk-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    /* Dark theme — deep indigo + gold */
+    --background: 0.14 0.04 280;
+    --foreground: 0.95 0.01 280;
+    --card: 0.18 0.05 275;
+    --card-foreground: 0.95 0.01 280;
+    --popover: 0.16 0.05 275;
+    --popover-foreground: 0.95 0.01 280;
+    --primary: 0.78 0.18 72;
+    --primary-foreground: 0.12 0.02 280;
+    --secondary: 0.24 0.07 280;
+    --secondary-foreground: 0.92 0.01 280;
+    --muted: 0.22 0.05 278;
+    --muted-foreground: 0.62 0.04 280;
+    --accent: 0.72 0.2 55;
+    --accent-foreground: 0.12 0.02 280;
+    --destructive: 0.58 0.22 25;
+    --destructive-foreground: 0.97 0.01 280;
+    --border: 0.28 0.06 280;
+    --input: 0.22 0.06 280;
+    --ring: 0.78 0.18 72;
+    --radius: 1rem;
+    --chart-1: 0.78 0.18 72;
+    --chart-2: 0.68 0.2 290;
+    --chart-3: 0.65 0.22 160;
+    --chart-4: 0.72 0.2 55;
+    --chart-5: 0.62 0.24 330;
+    --sidebar: 0.16 0.05 275;
+    --sidebar-foreground: 0.92 0.01 280;
+    --sidebar-primary: 0.78 0.18 72;
+    --sidebar-primary-foreground: 0.12 0.02 280;
+    --sidebar-accent: 0.22 0.06 278;
+    --sidebar-accent-foreground: 0.92 0.01 280;
+    --sidebar-border: 0.28 0.06 280;
+    --sidebar-ring: 0.78 0.18 72;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    overflow-x: hidden;
+  }
+}
+
+/* Coin glow effect */
+.coin-glow {
+  filter: drop-shadow(0 0 12px oklch(0.78 0.18 72 / 0.6));
+}
+
+/* Card glass effect */
+.glass-card {
+  background: oklch(0.18 0.05 275 / 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid oklch(0.32 0.08 280 / 0.4);
+}
+
+/* Gradient backgrounds */
+.bg-hero-gradient {
+  background: linear-gradient(
+    135deg,
+    oklch(0.22 0.1 290) 0%,
+    oklch(0.16 0.08 310) 50%,
+    oklch(0.14 0.06 280) 100%
+  );
+}
+
+.bg-gold-gradient {
+  background: linear-gradient(
+    135deg,
+    oklch(0.82 0.2 72) 0%,
+    oklch(0.72 0.22 55) 100%
+  );
+}
+
+.bg-coin-card {
+  background: linear-gradient(
+    135deg,
+    oklch(0.24 0.12 290) 0%,
+    oklch(0.2 0.1 310) 100%
+  );
+}
+
+/* Spin wheel */
+.spin-wheel {
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+}
+
+.spin-wheel-segment {
+  position: absolute;
+  width: 50%;
+  height: 50%;
+  transform-origin: bottom right;
+}
+
+/* Scratch card */
+.scratch-card {
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.3s ease;
+}
+
+.scratch-card:hover {
+  transform: scale(1.02);
+}
+
+/* Bottom nav */
+.bottom-nav {
+  background: oklch(0.16 0.06 275 / 0.95);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid oklch(0.28 0.08 280 / 0.5);
+}
+
+/* Pulse animation for coins */
+@keyframes coin-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.coin-pulse {
+  animation: coin-pulse 2s ease-in-out infinite;
+}
+
+/* Shimmer effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    oklch(0.82 0.2 72),
+    oklch(0.95 0.15 90),
+    oklch(0.82 0.2 72)
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.08 280);
+  border-radius: 2px;
+}

@@ -21,8 +21,39 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+
+// ─── Google GSI type ──────────────────────────────────────────────────────────
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+            auto_select?: boolean;
+          }) => void;
+          renderButton: (element: HTMLElement, config: object) => void;
+          prompt: () => void;
+        };
+      };
+    };
+  }
+}
+
+// Google OAuth Client ID - Replace with your actual Client ID from Google Cloud Console
+const GOOGLE_CLIENT_ID =
+  "921482164764-tq6kq9j993v05jmebcncmcdum470maqh.apps.googleusercontent.com";
+
+function parseJwt(token: string): { name?: string; email?: string } {
+  try {
+    return JSON.parse(atob(token.split(".")[1]));
+  } catch {
+    return {};
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface WithdrawEntry {
@@ -149,6 +180,7 @@ function LoginScreen({
   const [name, setName] = useState("");
   const [referral, setReferral] = useState("");
   const [logoClicks, setLogoClicks] = useState(0);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const handleLogoClick = () => {
     setLogoClicks((c) => c + 1);
@@ -161,6 +193,43 @@ function LoginScreen({
     }
     onLogin(name.trim(), referral.trim());
   };
+
+  // Initialize Google Sign-In
+  useEffect(() => {
+    const initGoogle = () => {
+      if (window.google?.accounts?.id && googleBtnRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => {
+            const payload = parseJwt(response.credential);
+            if (payload.name) {
+              onLogin(payload.name, referral.trim());
+              toast.success(`Welcome, ${payload.name}! 🎉`);
+            }
+          },
+        });
+        window.google.accounts.id.renderButton(googleBtnRef.current, {
+          theme: "outline",
+          size: "large",
+          width: "100%",
+          text: "signin_with",
+          shape: "rectangular",
+        });
+      }
+    };
+    // Try immediately or wait for script load
+    if (window.google) {
+      initGoogle();
+    } else {
+      const script = document.querySelector(
+        'script[src*="accounts.google.com/gsi"]',
+      );
+      if (script) {
+        script.addEventListener("load", initGoogle);
+        return () => script.removeEventListener("load", initGoogle);
+      }
+    }
+  }, [onLogin, referral]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -217,6 +286,21 @@ function LoginScreen({
           >
             🚀 Start Earning
           </Button>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-1">
+            <div className="flex-1 h-px bg-border/40" />
+            <span className="text-xs text-muted-foreground font-body">or</span>
+            <div className="flex-1 h-px bg-border/40" />
+          </div>
+
+          {/* Google Sign-In Button */}
+          <div
+            data-ocid="login.google_button"
+            ref={googleBtnRef}
+            className="w-full flex justify-center"
+          />
+
           {logoClicks >= 5 && (
             <Button
               data-ocid="admin.open_modal_button"
@@ -239,6 +323,41 @@ function LoginScreen({
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── AdSense Banner Component ─────────────────────────────────────────────────
+function AdBanner({
+  slot = "auto",
+  format = "auto",
+  style = {},
+}: { slot?: string; format?: string; style?: React.CSSProperties }) {
+  const adRef = useRef<HTMLModElement>(null);
+  useEffect(() => {
+    try {
+      // biome-ignore lint/suspicious/noExplicitAny: adsbygoogle global
+      (window as any).adsbygoogle = (window as any).adsbygoogle || [];
+      // biome-ignore lint/suspicious/noExplicitAny: adsbygoogle global
+      ((window as any).adsbygoogle as unknown[]).push({});
+    } catch (_e) {
+      // AdSense not loaded yet
+    }
+  }, []);
+  return (
+    <div
+      className="w-full overflow-hidden rounded-xl my-2"
+      style={{ minHeight: 60, ...style }}
+    >
+      <ins
+        ref={adRef}
+        className="adsbygoogle"
+        style={{ display: "block", width: "100%", minHeight: 60 }}
+        data-ad-client="ca-pub-6188518298786560"
+        data-ad-slot={slot}
+        data-ad-format={format}
+        data-full-width-responsive="true"
+      />
     </div>
   );
 }
@@ -363,6 +482,9 @@ function HomeTab({
           1000 coins = ₹10 &nbsp;·&nbsp; Min withdraw ₹50 (5000 coins)
         </p>
       </div>
+
+      {/* AdSense Banner Ad */}
+      <AdBanner slot="YOUR_HOME_AD_SLOT" />
     </div>
   );
 }
@@ -420,6 +542,18 @@ function EarnTab({
     setIsWatching(true);
     setCountdown(5);
 
+    // Push AdSense ad when watching starts
+    setTimeout(() => {
+      try {
+        // biome-ignore lint/suspicious/noExplicitAny: adsbygoogle global
+        (window as any).adsbygoogle = (window as any).adsbygoogle || [];
+        // biome-ignore lint/suspicious/noExplicitAny: adsbygoogle global
+        ((window as any).adsbygoogle as unknown[]).push({});
+      } catch (_e) {
+        // AdSense not loaded yet - ok
+      }
+    }, 100);
+
     const interval = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -474,16 +608,27 @@ function EarnTab({
       <div className="glass-card rounded-3xl p-8 text-center">
         {isWatching ? (
           <div data-ocid="earn.loading_state" className="space-y-4">
-            <div className="w-24 h-24 rounded-full bg-gold-500/10 border-2 border-gold-500 flex items-center justify-center mx-auto animate-pulse">
-              <span className="text-4xl font-display font-black text-gold-400">
+            {/* Real AdSense Ad Unit */}
+            <div className="w-full overflow-hidden rounded-xl border border-border/40 bg-secondary/20 min-h-[100px] flex flex-col items-center justify-center">
+              <ins
+                className="adsbygoogle"
+                style={{ display: "block", width: "100%", minHeight: "100px" }}
+                data-ad-client="ca-pub-6188518298786560"
+                data-ad-slot="YOUR_WATCHAD_SLOT"
+                data-ad-format="auto"
+                data-full-width-responsive="true"
+              />
+            </div>
+            <div className="w-20 h-20 rounded-full bg-gold-500/10 border-2 border-gold-500 flex items-center justify-center mx-auto animate-pulse">
+              <span className="text-3xl font-display font-black text-gold-400">
                 {countdown}
               </span>
             </div>
             <p className="text-muted-foreground font-body text-sm">
-              📺 Ad playing... {countdown} seconds
+              📺 Ad chal rahi hai... {countdown} seconds
             </p>
             <div className="text-xs text-muted-foreground/60 font-body">
-              Please wait for the ad to finish
+              Ad khatam hone tak wait karein
             </div>
           </div>
         ) : (
@@ -506,6 +651,9 @@ function EarnTab({
           </div>
         )}
       </div>
+
+      {/* AdSense Banner Ad */}
+      <AdBanner slot="YOUR_EARN_AD_SLOT" />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
@@ -860,6 +1008,9 @@ function TasksTab({
           📋 Copy Code
         </Button>
       </div>
+
+      {/* AdSense Banner Ad */}
+      <AdBanner slot="YOUR_TASKS_AD_SLOT" />
     </div>
   );
 }
@@ -935,6 +1086,9 @@ function WalletTab({
 
   return (
     <div className="p-4 space-y-4">
+      {/* AdSense Banner Ad */}
+      <AdBanner slot="YOUR_WALLET_AD_SLOT" />
+
       {/* Balance */}
       <div className="bg-coin-card rounded-3xl p-6 text-center shadow-gold">
         <p className="text-xs uppercase tracking-widest text-muted-foreground font-body mb-1">

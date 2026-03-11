@@ -115,7 +115,7 @@ const STORAGE_KEY = "adreward_state";
 const MAX_DAILY_ADS = 10;
 const COINS_PER_AD = 5;
 const COINS_TO_INR = 1000 / 10; // 1000 coins = ₹10
-const MIN_WITHDRAW_COINS = 5000;
+const MIN_WITHDRAW_COINS = 1000;
 
 const SPIN_SEGMENTS = [
   { coins: 20, color: "#7C3AED", label: "20" },
@@ -316,7 +316,7 @@ function LoginScreen({
         {/* Info strip */}
         <div className="mt-6 text-center space-y-1">
           <p className="text-muted-foreground text-xs font-body">
-            1000 coins = ₹10 &nbsp;|&nbsp; Min withdraw ₹50
+            1000 coins = ₹10 &nbsp;|&nbsp; Min withdraw ₹10
           </p>
           <p className="text-muted-foreground text-xs font-body">
             Watch ads, spin wheel & earn daily!
@@ -479,7 +479,7 @@ function HomeTab({
       <div className="bg-gold-500/10 border border-gold-500/30 rounded-2xl p-4 flex items-center gap-3">
         <span className="text-2xl">💡</span>
         <p className="text-xs text-gold-300 font-body">
-          1000 coins = ₹10 &nbsp;·&nbsp; Min withdraw ₹50 (5000 coins)
+          1000 coins = ₹10 &nbsp;·&nbsp; Min withdraw ₹10 (5000 coins)
         </p>
       </div>
 
@@ -608,15 +608,17 @@ function EarnTab({
       <div className="glass-card rounded-3xl p-8 text-center">
         {isWatching ? (
           <div data-ocid="earn.loading_state" className="space-y-4">
-            {/* Real AdSense Ad Unit */}
-            <div className="w-full overflow-hidden rounded-xl border border-border/40 bg-secondary/20 min-h-[100px] flex flex-col items-center justify-center">
-              <ins
-                className="adsbygoogle"
-                style={{ display: "block", width: "100%", minHeight: "100px" }}
-                data-ad-client="ca-pub-6188518298786560"
-                data-ad-slot="YOUR_WATCHAD_SLOT"
-                data-ad-format="auto"
-                data-full-width-responsive="true"
+            {/* Video Ad */}
+            <div className="w-full overflow-hidden rounded-xl border border-border/40 bg-black">
+              <iframe
+                width="100%"
+                height="200"
+                src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0"
+                title="Ad"
+                frameBorder="0"
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+                style={{ display: "block" }}
               />
             </div>
             <div className="w-20 h-20 rounded-full bg-gold-500/10 border-2 border-gold-500 flex items-center justify-center mx-auto animate-pulse">
@@ -1454,9 +1456,9 @@ function AdminPanel({ onExit }: { onExit: () => void }) {
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [pwError, setPwError] = useState("");
-  const [activeTab, setActiveTab] = useState<"withdrawals" | "absences">(
-    "withdrawals",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "withdrawals" | "absences" | "payments"
+  >("withdrawals");
 
   // Withdraw requests state
   const [requests, setRequests] = useState<AdminWithdrawEntry[]>(() =>
@@ -1476,9 +1478,14 @@ function AdminPanel({ onExit }: { onExit: () => void }) {
     if (password === ADMIN_PASSWORD) {
       setIsLoggedIn(true);
       setPwError("");
+      setRequests(loadAdminRequests());
     } else {
       setPwError("Incorrect password. Try again.");
     }
+  };
+
+  const handleRefresh = () => {
+    setRequests(loadAdminRequests());
   };
 
   const handleApprove = (id: number) => {
@@ -1661,6 +1668,14 @@ function AdminPanel({ onExit }: { onExit: () => void }) {
           >
             📅 Absence Management
           </button>
+          <button
+            type="button"
+            data-ocid="admin.payment_tab"
+            onClick={() => setActiveTab("payments")}
+            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-body transition-colors ${activeTab === "payments" ? "bg-gold-400/20 text-gold-400 font-bold" : "text-muted-foreground hover:bg-secondary/40"}`}
+          >
+            💰 Payment Scanner
+          </button>
         </aside>
 
         {/* Mobile tabs */}
@@ -1685,12 +1700,20 @@ function AdminPanel({ onExit }: { onExit: () => void }) {
               >
                 📅 Absences
               </TabsTrigger>
+              <TabsTrigger
+                data-ocid="admin.payment_tab"
+                value="payments"
+                className="flex-1 text-xs font-body data-[state=active]:text-gold-400"
+              >
+                💰 Payments
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="withdrawals" className="mt-0 p-4">
               <AdminWithdrawalsContent
                 requests={requests}
                 onApprove={handleApprove}
                 onReject={handleReject}
+                onRefresh={handleRefresh}
                 statusBadge={statusBadge}
               />
             </TabsContent>
@@ -1712,6 +1735,9 @@ function AdminPanel({ onExit }: { onExit: () => void }) {
                 statusBadge={statusBadge}
               />
             </TabsContent>
+            <TabsContent value="payments" className="mt-0 p-4">
+              <AdminPaymentScanner requests={requests} />
+            </TabsContent>
           </Tabs>
         </div>
 
@@ -1722,6 +1748,7 @@ function AdminPanel({ onExit }: { onExit: () => void }) {
               requests={requests}
               onApprove={handleApprove}
               onReject={handleReject}
+              onRefresh={handleRefresh}
               statusBadge={statusBadge}
             />
           )}
@@ -1745,7 +1772,414 @@ function AdminPanel({ onExit }: { onExit: () => void }) {
               />
             </div>
           )}
+          {activeTab === "payments" && (
+            <AdminPaymentScanner requests={requests} />
+          )}
         </main>
+      </div>
+    </div>
+  );
+}
+
+function AdminPaymentScanner({ requests }: { requests: AdminWithdrawEntry[] }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scannedResults, setScannedResults] = useState<string[]>([]);
+  const [matchedUpiIds, setMatchedUpiIds] = useState<Set<string>>(new Set());
+  const [cameraError, setCameraError] = useState("");
+
+  const allUpiIds = requests.map((r) => r.upiId.toLowerCase());
+
+  const totalAmount = requests.reduce((sum, r) => sum + r.amount, 0);
+  const pendingAmount = requests
+    .filter((r) => r.status === "Pending")
+    .reduce((sum, r) => sum + r.amount, 0);
+  const approvedAmount = requests
+    .filter((r) => r.status === "Approved")
+    .reduce((sum, r) => sum + r.amount, 0);
+  const rejectedAmount = requests
+    .filter((r) => r.status === "Rejected")
+    .reduce((sum, r) => sum + r.amount, 0);
+
+  const extractUpiId = (text: string): string | null => {
+    // UPI QR format: upi://pay?pa=user@bank&...
+    const paMatch = text.match(/[?&]pa=([^&]+)/i);
+    if (paMatch) return paMatch[1];
+    // Sometimes plain UPI ID like user@bank
+    if (text.includes("@") && !text.includes(" ")) return text;
+    return null;
+  };
+
+  const scanFrame = async () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    try {
+      // @ts-ignore - BarcodeDetector is a modern browser API
+      if (!("BarcodeDetector" in window)) return;
+      // @ts-ignore
+      const detector = new BarcodeDetector({ formats: ["qr_code"] });
+      const barcodes = await detector.detect(canvas);
+      for (const barcode of barcodes) {
+        const raw: string = barcode.rawValue;
+        const upiId = extractUpiId(raw);
+        const display = upiId ? `UPI: ${upiId}` : raw;
+        setScannedResults((prev) => {
+          if (prev.includes(display)) return prev;
+          return [display, ...prev.slice(0, 9)];
+        });
+        if (upiId) {
+          const lower = upiId.toLowerCase();
+          if (allUpiIds.includes(lower)) {
+            setMatchedUpiIds((prev) => new Set([...prev, lower]));
+            toast.success(`✅ UPI match found: ${upiId}`);
+          }
+        }
+      }
+    } catch {
+      /* ignore scan errors */
+    }
+  };
+
+  const startScanning = async () => {
+    setCameraError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setIsScanning(true);
+      intervalRef.current = setInterval(scanFrame, 200);
+    } catch {
+      setCameraError(
+        "Camera access denied. Please allow camera permission and try again.",
+      );
+    }
+  };
+
+  const stopScanning = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (streamRef.current) {
+      for (const t of streamRef.current.getTracks()) {
+        t.stop();
+      }
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsScanning(false);
+  };
+
+  const clearResults = () => {
+    setScannedResults([]);
+    setMatchedUpiIds(new Set());
+  };
+
+  // Cleanup on unmount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cleanup only
+  useEffect(() => {
+    return () => {
+      stopScanning();
+    };
+  }, []);
+
+  const statusBadgeClass = (status: string) => {
+    if (status === "Approved")
+      return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+    if (status === "Rejected")
+      return "bg-red-500/20 text-red-400 border-red-500/30";
+    return "bg-amber-500/20 text-amber-400 border-amber-500/30";
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="font-display font-bold text-xl text-foreground">
+        💰 Payment Scanner
+      </h2>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="glass-card rounded-2xl p-4 space-y-1 col-span-2 md:col-span-1 border border-yellow-500/20">
+          <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+            Total Requests
+          </p>
+          <p className="font-display font-black text-2xl text-gold-400">
+            {requests.length}
+          </p>
+        </div>
+        <div className="glass-card rounded-2xl p-4 space-y-1 border border-yellow-500/30">
+          <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+            Total Amount
+          </p>
+          <p className="font-display font-black text-2xl text-gold-400">
+            ₹{totalAmount.toFixed(2)}
+          </p>
+        </div>
+        <div className="glass-card rounded-2xl p-4 space-y-1 border border-amber-500/20">
+          <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+            Pending
+          </p>
+          <p className="font-display font-black text-2xl text-amber-400">
+            ₹{pendingAmount.toFixed(2)}
+          </p>
+        </div>
+        <div className="glass-card rounded-2xl p-4 space-y-1 border border-emerald-500/20">
+          <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+            Approved
+          </p>
+          <p className="font-display font-black text-2xl text-emerald-400">
+            ₹{approvedAmount.toFixed(2)}
+          </p>
+        </div>
+        <div className="glass-card rounded-2xl p-4 space-y-1 border border-red-500/20">
+          <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+            Rejected
+          </p>
+          <p className="font-display font-black text-2xl text-red-400">
+            ₹{rejectedAmount.toFixed(2)}
+          </p>
+        </div>
+      </div>
+
+      {/* QR Scanner */}
+      <div className="glass-card rounded-2xl p-6 space-y-4 border border-gold-400/10">
+        <div className="flex items-center justify-between">
+          <h3 className="font-display font-bold text-lg text-foreground">
+            📷 UPI QR Scanner
+          </h3>
+          <div className="flex gap-2">
+            {!isScanning ? (
+              <button
+                type="button"
+                data-ocid="admin.scanner_start_button"
+                onClick={startScanning}
+                className="px-4 py-2 rounded-xl text-sm font-body font-semibold bg-gold-400/20 text-gold-400 border border-gold-400/30 hover:bg-gold-400/30 transition-colors"
+              >
+                ▶ Start Scanning
+              </button>
+            ) : (
+              <button
+                type="button"
+                data-ocid="admin.scanner_stop_button"
+                onClick={stopScanning}
+                className="px-4 py-2 rounded-xl text-sm font-body font-semibold bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+              >
+                ⏹ Stop Scanning
+              </button>
+            )}
+            {scannedResults.length > 0 && (
+              <button
+                type="button"
+                data-ocid="admin.scanner_clear_button"
+                onClick={clearResults}
+                className="px-4 py-2 rounded-xl text-sm font-body bg-secondary/40 text-muted-foreground hover:bg-secondary/60 transition-colors"
+              >
+                🗑 Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {cameraError && (
+          <div
+            data-ocid="admin.error_state"
+            className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm font-body"
+          >
+            {cameraError}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Camera Preview */}
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+              Camera Feed
+            </p>
+            <div className="relative bg-secondary/20 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-border/30">
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                style={{
+                  width: "100%",
+                  display: isScanning ? "block" : "none",
+                }}
+              />
+              <canvas ref={canvasRef} style={{ display: "none" }} />
+              {!isScanning && (
+                <div className="text-center p-8 text-muted-foreground">
+                  <div className="text-4xl mb-2">📷</div>
+                  <p className="text-sm font-body">
+                    Click "Start Scanning" to open camera
+                  </p>
+                  <p className="text-xs mt-1 opacity-60 font-body">
+                    Point camera at UPI QR code
+                  </p>
+                </div>
+              )}
+              {isScanning && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="w-40 h-40 border-2 border-gold-400 rounded-xl opacity-60" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Scanned Results */}
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground font-body uppercase tracking-wider">
+              Scanned Results
+            </p>
+            <div className="bg-secondary/20 rounded-xl border border-border/30 min-h-[180px] max-h-[250px] overflow-y-auto">
+              {scannedResults.length === 0 ? (
+                <div
+                  data-ocid="admin.scanner.empty_state"
+                  className="p-6 text-center text-muted-foreground text-sm font-body"
+                >
+                  No QR codes scanned yet
+                </div>
+              ) : (
+                <div className="p-3 space-y-2">
+                  {scannedResults.map((result) => {
+                    const upiMatch = result.startsWith("UPI: ");
+                    const upiId = upiMatch ? result.replace("UPI: ", "") : null;
+                    const isMatched =
+                      upiId && matchedUpiIds.has(upiId.toLowerCase());
+                    return (
+                      <div
+                        key={result}
+                        className={`px-3 py-2 rounded-lg text-xs font-mono flex items-center gap-2 ${isMatched ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-secondary/40 text-foreground"}`}
+                      >
+                        {isMatched && <span>✅</span>}
+                        {upiMatch && !isMatched && <span>💳</span>}
+                        {!upiMatch && <span>📋</span>}
+                        <span className="truncate">{result}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {matchedUpiIds.size > 0 && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3">
+                <p className="text-emerald-400 text-xs font-body font-semibold">
+                  ✅ {matchedUpiIds.size} UPI ID(s) matched with pending
+                  withdrawal requests!
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* All Payments Table */}
+      <div className="space-y-3">
+        <h3 className="font-display font-bold text-lg text-foreground">
+          📋 All Payment Requests
+        </h3>
+        {requests.length === 0 ? (
+          <div
+            data-ocid="admin.payments.empty_state"
+            className="glass-card rounded-2xl p-12 text-center"
+          >
+            <p className="text-muted-foreground font-body">
+              No payment requests found.
+            </p>
+          </div>
+        ) : (
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/30">
+                  <TableHead className="text-muted-foreground font-body text-xs">
+                    Date
+                  </TableHead>
+                  <TableHead className="text-muted-foreground font-body text-xs">
+                    User
+                  </TableHead>
+                  <TableHead className="text-muted-foreground font-body text-xs">
+                    UPI ID
+                  </TableHead>
+                  <TableHead className="text-muted-foreground font-body text-xs">
+                    Coins
+                  </TableHead>
+                  <TableHead className="text-muted-foreground font-body text-xs">
+                    Amount
+                  </TableHead>
+                  <TableHead className="text-muted-foreground font-body text-xs">
+                    Payment Status
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {requests.map((req, idx) => (
+                  <TableRow
+                    key={req.id}
+                    data-ocid={`admin.payments.row.${idx + 1}`}
+                    className={`border-border/20 ${matchedUpiIds.has(req.upiId.toLowerCase()) ? "bg-gold-400/5" : ""}`}
+                  >
+                    <TableCell className="text-xs font-body text-muted-foreground">
+                      {req.date}
+                    </TableCell>
+                    <TableCell className="text-xs font-body text-foreground font-medium">
+                      {req.userName}
+                    </TableCell>
+                    <TableCell className="text-xs font-mono text-foreground">
+                      {matchedUpiIds.has(req.upiId.toLowerCase()) ? (
+                        <span className="text-gold-400">✅ {req.upiId}</span>
+                      ) : (
+                        req.upiId
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs font-body text-gold-400">
+                      {req.coins.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-xs font-body text-foreground">
+                      ₹{req.amount}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full border font-body ${statusBadgeClass(req.status)}`}
+                      >
+                        {req.status}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {/* Summary row */}
+            <div className="border-t border-border/30 px-4 py-3 flex flex-wrap gap-4 bg-secondary/10">
+              <span className="text-xs font-body font-semibold text-emerald-400">
+                Total Approved: ₹{approvedAmount.toFixed(2)}
+              </span>
+              <span className="text-xs text-muted-foreground">|</span>
+              <span className="text-xs font-body font-semibold text-amber-400">
+                Total Pending: ₹{pendingAmount.toFixed(2)}
+              </span>
+              <span className="text-xs text-muted-foreground">|</span>
+              <span className="text-xs font-body font-semibold text-red-400">
+                Total Rejected: ₹{rejectedAmount.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1755,18 +2189,30 @@ function AdminWithdrawalsContent({
   requests,
   onApprove,
   onReject,
+  onRefresh,
   statusBadge,
 }: {
   requests: AdminWithdrawEntry[];
   onApprove: (id: number) => void;
   onReject: (id: number) => void;
+  onRefresh: () => void;
   statusBadge: (s: string) => string;
 }) {
   return (
     <div className="space-y-4">
-      <h2 className="font-display font-bold text-xl text-foreground">
-        💳 Withdraw Requests
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-display font-bold text-xl text-foreground">
+          💳 Withdraw Requests
+        </h2>
+        <button
+          type="button"
+          data-ocid="admin.refresh_button"
+          onClick={onRefresh}
+          className="text-xs px-3 py-1.5 rounded-lg bg-secondary/40 text-muted-foreground hover:bg-secondary/70 transition-colors"
+        >
+          🔄 Refresh
+        </button>
+      </div>
       {requests.length === 0 ? (
         <div
           data-ocid="admin.empty_state"
@@ -2090,18 +2536,25 @@ export default function App() {
   }, []);
 
   const handleLogin = (name: string, referral: string) => {
+    const isNewUser = !state.isLoggedIn && state.coins === 0;
+    const welcomeBonus = isNewUser ? 1000 : 0;
     const newState: Partial<AppState> = {
       isLoggedIn: true,
       userName: name,
       referralCode: genReferralCode(),
+      coins: (state.coins || 0) + welcomeBonus,
+      totalCoinsEarned: (state.totalCoinsEarned || 0) + welcomeBonus,
     };
     // Referral bonus
     if (referral && referral.length === 6) {
-      newState.coins = (state.coins || 0) + 500;
-      newState.totalCoinsEarned = (state.totalCoinsEarned || 0) + 500;
+      newState.coins = (newState.coins || 0) + 500;
+      newState.totalCoinsEarned = (newState.totalCoinsEarned || 0) + 500;
       toast.success("🎉 Referral bonus! +500 Coins");
     }
     updateState(newState);
+    if (welcomeBonus > 0) {
+      setTimeout(() => toast.success("🎉 Welcome! 1000 Free Coins mile!"), 300);
+    }
   };
 
   const handleLogout = () => {
